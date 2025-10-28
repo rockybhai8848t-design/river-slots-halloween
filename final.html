@@ -19,12 +19,25 @@ body{margin:0;font-family:Poppins,system-ui,Segoe UI,Roboto;background:var(--bg)
 .header .accent{color:var(--accent-2);text-shadow:0 0 18px rgba(255,165,66,.35)}
 .subtitle{color:var(--muted);margin:0 0 8px}
 .card{margin:12px auto;padding:16px;border:1px solid var(--line);border-radius:18px;background:
-  linear-gradient(180deg,rgba(255,153,0,.06),rgba(0,0,0,0)),var(--card)}
-.form-row{display:flex;gap:12px;align-items:center;margin-bottom:10px}
+  radial-gradient(120% 120% at 50% -20%, rgba(255,153,0,.08), transparent 60%), var(--card)}
+.form-row{display:flex;gap:12px;align-items:center;margin-bottom:12px}
 .form-row label{min-width:110px;color:var(--muted)}
-.form-row input{flex:1;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:#0d0a12;color:var(--ink)}
+.form-row input{
+  flex:1;padding:12px 14px;border-radius:12px;border:1px solid var(--line);
+  background:#0d0a12;color:var(--ink);caret-color:var(--ink);
+}
+.form-row input::placeholder{color:#b8b0d6}
+.form-row input:-webkit-autofill,
+.form-row input:-webkit-autofill:hover,
+.form-row input:-webkit-autofill:focus{
+  -webkit-text-fill-color:var(--ink);
+  transition:background-color 5000s ease-in-out 0s;
+  box-shadow: 0 0 0px 1000px #0d0a12 inset !important;
+}
+
 .wheel-wrap{display:grid;place-items:center;gap:14px}
 #wheel{width:100%;max-width:420px;aspect-ratio:1/1;background:transparent;display:block}
+
 .btn{
   border:0;padding:14px 22px;border-radius:16px;background:linear-gradient(180deg,#ffb14d,#ff7a00);
   color:#1a0f00;font-weight:800;letter-spacing:.3px;cursor:pointer;box-shadow:0 8px 24px rgba(255,122,0,.25)
@@ -32,7 +45,8 @@ body{margin:0;font-family:Poppins,system-ui,Segoe UI,Roboto;background:var(--bg)
 .btn:disabled{opacity:.55;cursor:not-allowed}
 .status{text-align:center;color:var(--muted);min-height:22px}
 .footer{display:flex;justify-content:space-between;color:var(--muted);margin-top:16px}
-/* Result modal */
+
+/* Modal */
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:16px;z-index:50}
 .modal.show{display:flex}
 .modal-card{width:min(92vw,520px);border-radius:18px;padding:22px;text-align:center;background:#1b1424;border:1px solid var(--line)}
@@ -46,21 +60,27 @@ body{margin:0;font-family:Poppins,system-ui,Segoe UI,Roboto;background:var(--bg)
       <h1>River Slots <span class="accent">Halloween</span> Spin &amp; Win</h1>
       <p class="subtitle">One spin per day • Enter your name • Good luck! 👻</p>
     </header>
+
     <section class="card">
       <div class="form-row">
         <label for="playerName">Your name</label>
         <input id="playerName" type="text" placeholder="Enter your name" maxlength="40" autocomplete="name" />
       </div>
+
       <div class="wheel-wrap">
         <canvas id="wheel" aria-label="Prize wheel" role="img"></canvas>
         <button id="spinBtn" class="btn">🎡 Spin</button>
       </div>
+
       <p id="status" class="status"></p>
     </section>
+
     <footer class="footer">
       <p>© <span id="year"></span> River Slots • Halloween Event</p>
       <a href="#" id="adminHelp" style="color:#ffe08a">Admin help</a>
     </footer>
+
+    <!-- Netlify-compatible hidden form (safe on GitHub Pages) -->
     <form name="spin-log" hidden>
       <input type="text" name="player_name" />
       <input type="text" name="prize" />
@@ -69,51 +89,218 @@ body{margin:0;font-family:Poppins,system-ui,Segoe UI,Roboto;background:var(--bg)
       <input type="text" name="event_tag" value="RiverSlotsHalloween2025" />
     </form>
   </main>
+
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
 <script>
-const CFG={eventTag:"RiverSlotsHalloween2025",spinLimit:"daily",prizes:[
-{label:"50% Bonus",weight:10},{label:"40% Bonus",weight:20},{label:"$10 Freeplay",weight:25},
-{label:"Refer 5 Friends & Get $20 (CashApp)",weight:20},{label:"Extra $5 on the Game",weight:20},{label:"100% Bonus",weight:5}]};
-const canvas=document.getElementById('wheel'),ctx=canvas.getContext('2d',{alpha:true}),
-spinBtn=document.getElementById('spinBtn'),statusEl=document.getElementById('status'),
-nameInput=document.getElementById('playerName');document.getElementById('year').textContent=new Date().getFullYear();
-function sizeCanvas(){const m=Math.min(420,Math.floor(Math.min(window.innerWidth,560)-32));canvas.width=m;canvas.height=m;}
-sizeCanvas();addEventListener('resize',sizeCanvas);
-const DEVKEY='rs_device_id',SPINKEY='rs_last_spin_ts';
-const deviceId=localStorage.getItem(DEVKEY)|| (localStorage.setItem(DEVKEY,(crypto.randomUUID?.()||Date.now()+"-"+Math.random().toString(16).slice(2))),localStorage.getItem(DEVKEY));
-const segs=CFG.prizes.map(p=>({label:p.label,weight:p.weight})),total=segs.reduce((a,b)=>a+b.weight,0);
-function canSpin(){if(CFG.spinLimit!=='daily')return true;const l=+localStorage.getItem(SPINKEY)||0;if(!l)return true;
-const d=new Date(l),n=new Date();return !(d.getFullYear()==n.getFullYear()&&d.getMonth()==n.getMonth()&&d.getDate()==n.getDate());}
-function setNow(){localStorage.setItem(SPINKEY,Date.now().toString());}
-function pickPrize(){const r=Math.random()*total;let a=0;for(const s of segs){a+=s.weight;if(r<=a)return s;}return segs.at(-1);}
-function drawFittedText(t,mL,mN,bS){let s=bS;ctx.font=`600 ${s}px Poppins`;while(ctx.measureText(t).width>mL&&s>11){s--;ctx.font=`600 ${s}px Poppins`;}
-const w=t.split(' '),L=[],l='';let c='';for(let i=0;i<w.length;i++){const T=(c?c+' ':'')+w[i];
-if(ctx.measureText(T).width>mL&&c){L.push(c);c=w[i];}else c=T;}if(c)L.push(c);if(L.length>mN)return drawFittedText(t,mL,mN,s-1);return{lines:L,size:s};}
-function drawWheel(rot=0){const S=canvas.width,r=S/2;ctx.clearRect(0,0,S,S);ctx.save();ctx.translate(r,r);ctx.rotate(rot);
-const cols=['#432053','#512565','#5e2b77','#6c3189','#7a39a0','#8741b6'];let a=-Math.PI/2;
-segs.forEach((s,i)=>{const ang=(s.weight/total)*Math.PI*2,b=a+ang;ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,r*0.96,a,b);ctx.closePath();
-ctx.fillStyle=cols[i%cols.length];ctx.fill();ctx.lineWidth=2;ctx.strokeStyle='rgba(255,255,255,.25)';ctx.stroke();
-ctx.save();const mid=(a+b)/2;const tx=Math.cos(mid)*r*0.62,ty=Math.sin(mid)*r*0.62;ctx.translate(tx,ty);ctx.rotate(mid+Math.PI/2);
-ctx.fillStyle='#fff4d6';const {lines,size}=drawFittedText(s.label,r*0.5,3,16);const lh=size+2;let y=-((lines.length-1)*lh)/2;
-ctx.textAlign='center';lines.forEach(L=>{ctx.fillText(L,0,y);y+=lh;});ctx.restore();a=b;});
-ctx.beginPath();ctx.arc(0,0,r*0.1,0,Math.PI*2);ctx.fillStyle='#ffb14d';ctx.fill();ctx.lineWidth=3;ctx.strokeStyle='#5a3900';ctx.stroke();
-ctx.beginPath();const tipY=-r*0.96;ctx.moveTo(-10,tipY+18);ctx.lineTo(10,tipY+18);ctx.lineTo(0,tipY-4);ctx.closePath();
-ctx.fillStyle='#ffcc66';ctx.fill();ctx.lineWidth=2;ctx.strokeStyle='#5a3900';ctx.stroke();ctx.restore();}
+/*** Config ***/
+const CFG = {
+  eventTag: "RiverSlotsHalloween2025",
+  spinLimit: "daily",
+  prizes: [
+    { label: "50% Bonus", weight: 10 },
+    { label: "40% Bonus", weight: 20 },
+    { label: "$10 Freeplay", weight: 25 },
+    { label: "Refer 5 Friends & Get $20 (CashApp)", weight: 20 },
+    { label: "Extra $5 on the Game", weight: 20 },
+    { label: "100% Bonus", weight: 5 }
+  ]
+};
+
+/*** Elements ***/
+const canvas = document.getElementById('wheel');
+const ctx = canvas.getContext('2d', { alpha: true });
+const spinBtn = document.getElementById('spinBtn');
+const statusEl = document.getElementById('status');
+const nameInput = document.getElementById('playerName');
+document.getElementById('year').textContent = new Date().getFullYear();
+
+/*** Responsive canvas ***/
+function sizeCanvas(){
+  const max = Math.min(420, Math.floor(Math.min(window.innerWidth, 560) - 32));
+  canvas.width = max;
+  canvas.height = max;
+}
+sizeCanvas(); addEventListener('resize', sizeCanvas);
+
+/*** Data & helpers ***/
+const DEVKEY='rs_device_id', SPINKEY='rs_last_spin_ts';
+const deviceId = localStorage.getItem(DEVKEY) || (localStorage.setItem(DEVKEY, (crypto.randomUUID?.() || Date.now()+"-"+Math.random().toString(16).slice(2))), localStorage.getItem(DEVKEY));
+const segs = CFG.prizes.map(p=>({label:p.label, weight:p.weight}));
+const total = segs.reduce((a,b)=>a+b.weight,0);
+
+function canSpin(){
+  if(CFG.spinLimit!=='daily') return true;
+  const last = +localStorage.getItem(SPINKEY)||0;
+  if(!last) return true;
+  const d=new Date(last), n=new Date();
+  return !(d.getFullYear()==n.getFullYear()&&d.getMonth()==n.getMonth()&&d.getDate()==n.getDate());
+}
+function setNow(){ localStorage.setItem(SPINKEY, Date.now().toString()); }
+
+function pickPrize(){
+  const r=Math.random()*total; let a=0;
+  for(const s of segs){ a+=s.weight; if(r<=a) return s; }
+  return segs[segs.length-1];
+}
+
+/*** Text fitting ***/
+function drawFittedText(text, maxWidth, maxLines, baseSize){
+  let size = baseSize;
+  ctx.font = `600 ${size}px Poppins`;
+  while (ctx.measureText(text).width > maxWidth && size > 11){
+    size -= 1;
+    ctx.font = `600 ${size}px Poppins`;
+  }
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (let i=0;i<words.length;i++){
+    const test = (line ? line+' ' : '') + words[i];
+    if (ctx.measureText(test).width > maxWidth && line) {
+      lines.push(line);
+      line = words[i];
+    } else line = test;
+  }
+  if (line) lines.push(line);
+  while (lines.length > maxLines){
+    size -= 1;
+    ctx.font = `600 ${size}px Poppins`;
+    return drawFittedText(text, maxWidth, maxLines, size);
+  }
+  return {lines, size};
+}
+
+/*** Draw wheel (pointer drawn AFTER rotation so it stays fixed) ***/
+function drawWheel(rot=0){
+  const S=canvas.width, r=S/2;
+  ctx.clearRect(0,0,S,S);
+
+  // Slices (rotates)
+  ctx.save(); ctx.translate(r,r); ctx.rotate(rot);
+  const colors=['#432053','#512565','#5e2b77','#6c3189','#7a39a0','#8741b6'];
+  let a=-Math.PI/2;
+  segs.forEach((s,i)=>{
+    const ang=(s.weight/total)*Math.PI*2, b=a+ang;
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.arc(0,0,r*0.96,a,b); ctx.closePath();
+    ctx.fillStyle=colors[i%colors.length]; ctx.fill();
+    ctx.lineWidth=2; ctx.strokeStyle='rgba(255,255,255,.25)'; ctx.stroke();
+
+    // Label
+    ctx.save();
+    const mid=(a+b)/2;
+    const tx=Math.cos(mid)*r*0.62, ty=Math.sin(mid)*r*0.62;
+    ctx.translate(tx,ty);
+    ctx.rotate(mid + Math.PI/2);
+    ctx.fillStyle='#fff4d6';
+    const {lines,size}=drawFittedText(s.label, r*0.5, 3, 16);
+    const lineH=size+2; let y=-((lines.length-1)*lineH)/2;
+    ctx.textAlign='center';
+    lines.forEach(L=>{ ctx.fillText(L,0,y); y+=lineH; });
+    ctx.restore();
+
+    a=b;
+  });
+  // Center hub
+  ctx.beginPath(); ctx.arc(0,0,r*0.1,0,Math.PI*2);
+  ctx.fillStyle='#ffb14d'; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle='#5a3900'; ctx.stroke();
+  ctx.restore();
+
+  // Pointer (DOES NOT ROTATE)
+  ctx.save();
+  ctx.translate(r, r);
+  const tipY = -r*0.96; // top rim
+  ctx.beginPath();
+  ctx.moveTo(-16, tipY + 26);
+  ctx.lineTo( 16, tipY + 26);
+  ctx.lineTo(  0, tipY - 6);
+  ctx.closePath();
+  ctx.fillStyle = '#ffcc66';
+  ctx.fill();
+  ctx.lineWidth=3; ctx.strokeStyle='#5a3900'; ctx.stroke();
+  ctx.restore();
+}
 drawWheel(0);
-function angleFor(l){let a=-Math.PI/2;for(const s of segs){const ang=(s.weight/total)*Math.PI*2,b=a+ang;if(s.label===l)return(a+b)/2;a=b;}return -Math.PI/2;}
-function animateTo(t,d){const e=5+Math.floor(Math.random()*3),f=(Math.PI*2)*e+(t-(-Math.PI/2)),du=4600,s=performance.now();
-(function fr(n){const T=Math.min(1,(n-s)/du),E=1-Math.pow(1-T,3);drawWheel(E*f);(T<1)?requestAnimationFrame(fr):d();})(s);}
-function showWin(n,p){confetti({particleCount:140,spread:70,origin:{y:.3}});confetti({particleCount:100,spread:110,origin:{y:.3}});
-let m=document.querySelector('.modal');if(!m){m=document.createElement('div');m.className='modal';
-m.innerHTML=`<div class="modal-card"><h3>🎉 Hurray, <span id="who"></span>!</h3><div>You won:</div><div class="prize" id="prizeText"></div><button class="btn close">OK</button></div>`;
-document.body.appendChild(m);m.querySelector('.close').addEventListener('click',()=>m.classList.remove('show'));}
-m.querySelector('#who').textContent=n||'Player';m.querySelector('#prizeText').textContent=p;m.classList.add('show');}
-document.getElementById('adminHelp').addEventListener('click',e=>{e.preventDefault();alert("Private result logging works automatically if deployed on Netlify. On GitHub Pages, the wheel works but logging is disabled.");});
-spinBtn.addEventListener('click',()=>{const N=(nameInput.value||"").trim();if(!N){statusEl.textContent="Please enter your name.";nameInput.focus();return;}
-if(!canSpin()){statusEl.textContent="You already spun today. Try again tomorrow!";return;}
-spinBtn.disabled=true;statusEl.textContent="Spinning…";const P=pickPrize(),T=angleFor(P.label);
-animateTo(T,()=>{setNow();statusEl.textContent="";showWin(N,P.label);});});
+
+/*** Compute angle for prize ***/
+function angleFor(label){
+  let a=-Math.PI/2;
+  for(const s of segs){
+    const ang=(s.weight/total)*Math.PI*2, b=a+ang;
+    if(s.label===label) return (a+b)/2;
+    a=b;
+  }
+  return -Math.PI/2;
+}
+
+/*** Spin animation ***/
+function animateTo(target,onDone){
+  const extra=5+Math.floor(Math.random()*3);
+  const final=(Math.PI*2)*extra + (target - (-Math.PI/2));
+  const duration=4600; const start=performance.now();
+  (function frame(now){
+    const t=Math.min(1,(now-start)/duration);
+    const e=1-Math.pow(1-t,3);
+    drawWheel(e*final);
+    (t<1)?requestAnimationFrame(frame):onDone();
+  })(start);
+}
+
+/*** Win modal + confetti ***/
+function showWin(name, prize){
+  confetti({ particleCount: 140, spread: 70, origin: { y: 0.3 } });
+  confetti({ particleCount: 100, spread: 110, origin: { y: 0.3 } });
+  let modal=document.querySelector('.modal');
+  if(!modal){
+    modal=document.createElement('div');
+    modal.className='modal';
+    modal.innerHTML=`
+      <div class="modal-card">
+        <h3>🎉 Hurray, <span id="who"></span>!</h3>
+        <div>You won:</div>
+        <div class="prize" id="prizeText"></div>
+        <button class="btn close">OK</button>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.querySelector('.close').addEventListener('click',()=>modal.classList.remove('show'));
+  }
+  modal.querySelector('#who').textContent = name || 'Player';
+  modal.querySelector('#prizeText').textContent = prize;
+  modal.classList.add('show');
+}
+
+/*** Optional logging (works on Netlify) ***/
+function logSpin({playerName, prize}){
+  try{
+    const data={"form-name":"spin-log",player_name:playerName,prize,device_id:deviceId,timestamp_iso:new Date().toISOString(),event_tag:CFG.eventTag};
+    const body=new URLSearchParams(data).toString();
+    fetch("/",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body}).catch(()=>{});
+  }catch(e){}
+}
+
+/*** Admin help ***/
+document.getElementById('adminHelp').addEventListener('click',(e)=>{
+  e.preventDefault();
+  alert("Private result logging works automatically if you deploy this page to Netlify (Forms → 'spin-log'). On GitHub Pages, the wheel works but logging is disabled.");
+});
+
+/*** Spin ***/
+spinBtn.addEventListener('click', ()=>{
+  const playerName=(nameInput.value||"").trim();
+  if(!playerName){ statusEl.textContent="Please enter your name."; nameInput.focus(); return; }
+  if(!canSpin()){ statusEl.textContent="You've already had your spin today. Try again tomorrow!"; return; }
+
+  spinBtn.disabled=true; statusEl.textContent="Spinning…";
+  const prize = pickPrize();
+  const target = angleFor(prize.label);
+
+  animateTo(target, ()=>{
+    setNow();
+    statusEl.textContent="";
+    showWin(playerName, prize.label);
+    logSpin({playerName, prize:prize.label});
+  });
+});
 </script>
 </body>
 </html>
-
