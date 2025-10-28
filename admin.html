@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>River Slots — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0e0b12;--card:#15121b;--ink:#f4f1ff;--muted:#cfc7ffcc;--line:rgba(255,255,255,.12);--gold:#ffcc66;--accent:#ff7a00}
+*{box-sizing:border-box} body{margin:0;font-family:Poppins,system-ui,Segoe UI,Roboto;background:var(--bg);color:var(--ink)}
+.wrap{max-width:960px;margin:0 auto;padding:16px}
+.card{background:#15121b;border:1px solid var(--line);border-radius:18px;padding:18px}
+h1{margin:6px 0 14px;font-weight:800;font-size:clamp(22px,5vw,34px)}
+.sub{color:var(--muted);margin-top:-4px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:10px 0}
+.btn{border:0;border-radius:12px;padding:10px 16px;font-weight:700;cursor:pointer;background:linear-gradient(180deg,#ffb14d,#ff7a00);color:#1a0f00}
+.link{color:var(--gold);text-decoration:underline}
+.table{width:100%;border-collapse:collapse;margin-top:10px;color:#f1e8ff}
+.table th,.table td{padding:8px 10px;border-bottom:1px solid #2c2036;text-align:left;font-size:14px}
+.muted{color:var(--muted)}
+.note{font-size:12px;color:#bbaed8;margin-top:6px}
+.badge{display:inline-block;padding:4px 8px;border-radius:999px;background:#2a2140;margin-left:8px;font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>River Slots — Admin <span id="mode" class="badge">Local</span></h1>
+  <div class="sub">View spin results. Password only — simple privacy.</div>
+
+  <!-- Gate -->
+  <div id="gate" class="card">
+    <div class="row">
+      <input id="pw" type="password" placeholder="Enter admin password (default: admin123)"
+             style="background:#0d0a12;border:1px solid var(--line);border-radius:12px;color:var(--ink);padding:10px 12px;outline:none;min-width:220px">
+      <button class="btn" id="enter">Enter</button>
+      <a class="link" href="./">Back to Wheel</a>
+    </div>
+    <div class="note">Tip: you can change the password inside this file (look for <code>ADMIN_PASSWORD</code>).</div>
+  </div>
+
+  <!-- Panel -->
+  <div id="panel" class="card" style="display:none">
+    <div class="row" style="justify-content:space-between">
+      <div>
+        <b>Results</b><br><span class="muted" id="sourceNote">Showing spins saved on this device.</span>
+      </div>
+      <div class="row">
+        <button class="btn" id="export">Export CSV</button>
+        <button class="btn" id="clear">Clear</button>
+        <a class="link" href="./">Back to Wheel</a>
+      </div>
+    </div>
+    <table class="table">
+      <thead><tr><th>Name</th><th>Prize</th><th>Time</th><th>Device</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="4" class="muted">No results yet.</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<script type="module">
+/* --------- CONFIG --------- */
+const ADMIN_PASSWORD = "admin123";           // ← change to your own simple password
+const LOCAL_KEY      = "rs_spin_log";        // must match index.html local logging key
+
+// OPTIONAL: Put your Firebase config below to enable cloud results.
+// If you leave as PLACEHOLDERs, page will stay in Local mode.
+const firebaseConfig = {
+  apiKey: "PLACEHOLDER",
+  authDomain: "PLACEHOLDER.firebaseapp.com",
+  projectId: "PLACEHOLDER",
+  storageBucket: "PLACEHOLDER.appspot.com",
+  messagingSenderId: "PLACEHOLDER",
+  appId: "PLACEHOLDER"
+};
+/* -------------------------- */
+
+const modeBadge = document.getElementById("mode");
+const gate  = document.getElementById("gate");
+const panel = document.getElementById("panel");
+const rows  = document.getElementById("rows");
+const sourceNote = document.getElementById("sourceNote");
+
+// Gate
+document.getElementById('enter').addEventListener('click', openPanel);
+document.getElementById('pw').addEventListener('keydown', e=>{ if(e.key==='Enter') openPanel(); });
+function openPanel(){
+  const v = document.getElementById('pw').value.trim();
+  if(v !== ADMIN_PASSWORD){ alert("Incorrect password."); return; }
+  gate.style.display='none'; panel.style.display='block';
+  start();
+}
+
+// Try Firebase. If config is placeholder or fails, fall back to Local.
+async function start(){
+  if (!firebaseConfig || firebaseConfig.apiKey === "PLACEHOLDER") {
+    useLocal();
+    return;
+  }
+  try{
+    const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js");
+    const { getFirestore, collection, query, orderBy, limit, onSnapshot } =
+      await import("https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js");
+    const app = initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+    modeBadge.textContent = "Cloud";
+    sourceNote.textContent = "Live results from Firebase (all phones).";
+    const q = query(collection(db,"spins"), orderBy("ts","desc"), limit(1000));
+    onSnapshot(q, snap=>{
+      if(snap.empty){ rows.innerHTML = `<tr><td colspan="4" class="muted">No results yet.</td></tr>`; return; }
+      rows.innerHTML = snap.docs.map(d=>{
+        const x = d.data(); const ts = x.ts?.toDate?.()?.toLocaleString?.() || "";
+        return `<tr><td>${esc(x.name)}</td><td>${esc(x.prize)}</td><td>${ts}</td><td>${esc(x.deviceId||"")}</td></tr>`;
+      }).join("");
+    });
+  }catch(err){
+    console.warn("Firebase not available, using Local mode.", err);
+    useLocal();
+  }
+}
+
+function useLocal(){
+  modeBadge.textContent = "Local";
+  sourceNote.textContent = "Showing spins saved on this device.";
+  renderLocal();
+}
+
+function renderLocal(){
+  const list = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
+  if(!list.length){ rows.innerHTML = `<tr><td colspan="4" class="muted">No results yet.</td></tr>`; return; }
+  rows.innerHTML = list.map(r=>{
+    const ts = new Date(r.ts || r.timestamp_iso || Date.now()).toLocaleString();
+    return `<tr><td>${esc(r.name || r.player_name || "")}</td><td>${esc(r.prize || "")}</td><td>${ts}</td><td>${esc(r.device_id || "")}</td></tr>`;
+  }).join("");
+}
+
+// Export CSV (works for both modes — uses what’s in the table)
+document.getElementById('export').addEventListener('click', ()=>{
+  const arr=[["Name","Prize","Timestamp","Device"]];
+  rows.querySelectorAll("tr").forEach(tr=>{
+    const t=[...tr.children].map(td=>td.textContent);
+    if(t[0] && t[0] !== "No results yet.") arr.push(t);
+  });
+  const csv = arr.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob = new Blob([csv], {type:"text/csv"}); const url=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download="river-slots-results.csv"; a.click(); URL.revokeObjectURL(url);
+});
+
+// Clear local (only affects Local mode)
+document.getElementById('clear').addEventListener('click', ()=>{
+  if(confirm("Clear local results on this device?")){
+    localStorage.removeItem(LOCAL_KEY);
+    renderLocal();
+  }
+});
+
+function esc(s){return (s||'').replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[m]));}
+</script>
+</body>
+</html>
