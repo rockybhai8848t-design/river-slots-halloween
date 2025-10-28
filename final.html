@@ -10,8 +10,7 @@
   --bg:#0e0b12; --card:#15121b; --ink:#f4f1ff; --muted:#cfc7ffcc;
   --accent:#ff7a00; --accent-2:#ffcc66; --line:rgba(255,255,255,0.12);
 }
-*{box-sizing:border-box}
-html,body{height:100%}
+*{box-sizing:border-box} html,body{height:100%}
 body{margin:0;font-family:Poppins,system-ui,Segoe UI,Roboto;background:var(--bg);color:var(--ink)}
 .container{max-width:960px;margin:0 auto;padding:16px 16px 56px}
 .header{text-align:center}
@@ -36,7 +35,7 @@ body{margin:0;font-family:Poppins,system-ui,Segoe UI,Roboto;background:var(--bg)
 }
 
 .wheel-wrap{display:grid;place-items:center;gap:14px}
-#wheel{width:100%;max-width:420px;aspect-ratio:1/1;background:transparent;display:block}
+#wheel{width:100%;max-width:440px;aspect-ratio:1/1;background:transparent;display:block}
 
 .btn{
   border:0;padding:14px 22px;border-radius:16px;background:linear-gradient(180deg,#ffb14d,#ff7a00);
@@ -44,14 +43,19 @@ body{margin:0;font-family:Poppins,system-ui,Segoe UI,Roboto;background:var(--bg)
 }
 .btn:disabled{opacity:.55;cursor:not-allowed}
 .status{text-align:center;color:var(--muted);min-height:22px}
-.footer{display:flex;justify-content:space-between;color:var(--muted);margin-top:16px}
+.footer{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:var(--muted);margin-top:16px}
+.footer a{color:#ffe08a;text-decoration:underline}
 
-/* Modal */
+/* Modal (win + admin) */
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:16px;z-index:50}
 .modal.show{display:flex}
-.modal-card{width:min(92vw,520px);border-radius:18px;padding:22px;text-align:center;background:#1b1424;border:1px solid var(--line)}
+.modal-card{width:min(94vw,620px);border-radius:18px;padding:22px;text-align:center;background:#1b1424;border:1px solid var(--line)}
 .modal-card h3{margin:0 0 8px;font-size:26px}
 .modal-card .prize{font-size:22px;font-weight:800;color:#ffe08a;margin:6px 0 4px}
+.table{width:100%;border-collapse:collapse;margin-top:10px;color:#f1e8ff}
+.table th,.table td{padding:8px 10px;border-bottom:1px solid #2c2036;text-align:left;font-size:14px}
+.tools{display:flex;gap:8px;justify-content:center;margin-top:12px}
+.small{font-size:12px;color:#c9c0e1}
 </style>
 </head>
 <body>
@@ -77,7 +81,8 @@ body{margin:0;font-family:Poppins,system-ui,Segoe UI,Roboto;background:var(--bg)
 
     <footer class="footer">
       <p>© <span id="year"></span> River Slots • Halloween Event</p>
-      <a href="#" id="adminHelp" style="color:#ffe08a">Admin help</a>
+      <a href="#" id="adminLogin">Admin</a>
+      <span class="small">Results saved locally on this device. We can upgrade to Firebase/Netlify for global logs.</span>
     </footer>
 
     <!-- Netlify-compatible hidden form (safe on GitHub Pages) -->
@@ -97,6 +102,7 @@ body{margin:0;font-family:Poppins,system-ui,Segoe UI,Roboto;background:var(--bg)
 const CFG = {
   eventTag: "RiverSlotsHalloween2025",
   spinLimit: "daily",
+  adminPassword: "River2025!", // ← change if you want
   prizes: [
     { label: "50% Bonus", weight: 10 },
     { label: "40% Bonus", weight: 20 },
@@ -115,16 +121,17 @@ const statusEl = document.getElementById('status');
 const nameInput = document.getElementById('playerName');
 document.getElementById('year').textContent = new Date().getFullYear();
 
-/*** Responsive canvas ***/
+/*** Responsive canvas — with safe minimum to prevent blank wheel ***/
 function sizeCanvas(){
-  const max = Math.min(420, Math.floor(Math.min(window.innerWidth, 560) - 32));
-  canvas.width = max;
-  canvas.height = max;
+  const w = Math.floor(window.innerWidth - 32);
+  const clamped = Math.min(440, Math.max(280, w)); // min 280px so it never collapses
+  canvas.width = clamped;
+  canvas.height = clamped;
 }
 sizeCanvas(); addEventListener('resize', sizeCanvas);
 
 /*** Data & helpers ***/
-const DEVKEY='rs_device_id', SPINKEY='rs_last_spin_ts';
+const DEVKEY='rs_device_id', SPINKEY='rs_last_spin_ts', LOGKEY='rs_spin_log';
 const deviceId = localStorage.getItem(DEVKEY) || (localStorage.setItem(DEVKEY, (crypto.randomUUID?.() || Date.now()+"-"+Math.random().toString(16).slice(2))), localStorage.getItem(DEVKEY));
 const segs = CFG.prizes.map(p=>({label:p.label, weight:p.weight}));
 const total = segs.reduce((a,b)=>a+b.weight,0);
@@ -171,20 +178,20 @@ function drawFittedText(text, maxWidth, maxLines, baseSize){
   return {lines, size};
 }
 
-/*** Draw wheel (pointer drawn AFTER rotation so it stays fixed) ***/
+/*** Draw wheel (slices rotate; pointer stays fixed & BIG) ***/
 function drawWheel(rot=0){
   const S=canvas.width, r=S/2;
   ctx.clearRect(0,0,S,S);
 
-  // Slices (rotates)
+  // ROTATING SLICES
   ctx.save(); ctx.translate(r,r); ctx.rotate(rot);
   const colors=['#432053','#512565','#5e2b77','#6c3189','#7a39a0','#8741b6'];
   let a=-Math.PI/2;
   segs.forEach((s,i)=>{
     const ang=(s.weight/total)*Math.PI*2, b=a+ang;
-    ctx.beginPath(); ctx.moveTo(0,0); ctx.arc(0,0,r*0.96,a,b); ctx.closePath();
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.arc(0,0,r*0.965,a,b); ctx.closePath();
     ctx.fillStyle=colors[i%colors.length]; ctx.fill();
-    ctx.lineWidth=2; ctx.strokeStyle='rgba(255,255,255,.25)'; ctx.stroke();
+    ctx.lineWidth=2; ctx.strokeStyle='rgba(255,255,255,.22)'; ctx.stroke();
 
     // Label
     ctx.save();
@@ -206,18 +213,18 @@ function drawWheel(rot=0){
   ctx.fillStyle='#ffb14d'; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle='#5a3900'; ctx.stroke();
   ctx.restore();
 
-  // Pointer (DOES NOT ROTATE)
+  // FIXED POINTER (bigger)
   ctx.save();
   ctx.translate(r, r);
-  const tipY = -r*0.96; // top rim
+  const tipY = -r*0.965; // top rim
   ctx.beginPath();
-  ctx.moveTo(-16, tipY + 26);
-  ctx.lineTo( 16, tipY + 26);
-  ctx.lineTo(  0, tipY - 6);
+  ctx.moveTo(-18, tipY + 30);
+  ctx.lineTo( 18, tipY + 30);
+  ctx.lineTo(  0, tipY - 8);
   ctx.closePath();
   ctx.fillStyle = '#ffcc66';
   ctx.fill();
-  ctx.lineWidth=3; ctx.strokeStyle='#5a3900'; ctx.stroke();
+  ctx.lineWidth=3.5; ctx.strokeStyle='#5a3900'; ctx.stroke();
   ctx.restore();
 }
 drawWheel(0);
@@ -250,10 +257,10 @@ function animateTo(target,onDone){
 function showWin(name, prize){
   confetti({ particleCount: 140, spread: 70, origin: { y: 0.3 } });
   confetti({ particleCount: 100, spread: 110, origin: { y: 0.3 } });
-  let modal=document.querySelector('.modal');
+  let modal=document.querySelector('.modal.win');
   if(!modal){
     modal=document.createElement('div');
-    modal.className='modal';
+    modal.className='modal win';
     modal.innerHTML=`
       <div class="modal-card">
         <h3>🎉 Hurray, <span id="who"></span>!</h3>
@@ -269,20 +276,76 @@ function showWin(name, prize){
   modal.classList.add('show');
 }
 
-/*** Optional logging (works on Netlify) ***/
+/*** Local logging (device private) + optional Netlify forms POST ***/
+function saveLog(row){
+  const list = JSON.parse(localStorage.getItem(LOGKEY) || "[]");
+  list.unshift(row);
+  localStorage.setItem(LOGKEY, JSON.stringify(list.slice(0,500)));
+}
 function logSpin({playerName, prize}){
+  const row = { name: playerName, prize, ts: new Date().toISOString() };
+  saveLog(row);
+  // Optional POST (works if deployed to Netlify later)
   try{
-    const data={"form-name":"spin-log",player_name:playerName,prize,device_id:deviceId,timestamp_iso:new Date().toISOString(),event_tag:CFG.eventTag};
+    const data={"form-name":"spin-log",player_name:playerName,prize,device_id:deviceId,timestamp_iso:row.ts,event_tag:CFG.eventTag};
     const body=new URLSearchParams(data).toString();
     fetch("/",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body}).catch(()=>{});
   }catch(e){}
 }
 
-/*** Admin help ***/
-document.getElementById('adminHelp').addEventListener('click',(e)=>{
+/*** Admin (local) ***/
+document.getElementById('adminLogin').addEventListener('click', (e)=>{
   e.preventDefault();
-  alert("Private result logging works automatically if you deploy this page to Netlify (Forms → 'spin-log'). On GitHub Pages, the wheel works but logging is disabled.");
+  const pw = prompt("Admin password:");
+  if(pw !== CFG.adminPassword) { alert("Incorrect password."); return; }
+  showAdmin();
 });
+
+function showAdmin(){
+  let modal=document.querySelector('.modal.admin');
+  if(!modal){
+    modal=document.createElement('div');
+    modal.className='modal admin';
+    modal.innerHTML=`
+      <div class="modal-card" style="text-align:left">
+        <h3 style="text-align:center">Admin — Results (this device)</h3>
+        <table class="table">
+          <thead><tr><th>Name</th><th>Prize</th><th>Time</th></tr></thead>
+          <tbody id="logRows"></tbody>
+        </table>
+        <div class="tools">
+          <button class="btn" id="exportCsv">Export CSV</button>
+          <button class="btn" id="clearLog">Clear Log</button>
+          <button class="btn close">Close</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.querySelector('.close').addEventListener('click',()=>modal.classList.remove('show'));
+    modal.querySelector('#clearLog').addEventListener('click',()=>{
+      if(confirm("Clear local results on this device?")){ localStorage.removeItem(LOGKEY); renderLog(); }
+    });
+    modal.querySelector('#exportCsv').addEventListener('click', exportCsv);
+  }
+  renderLog();
+  modal.classList.add('show');
+}
+
+function renderLog(){
+  const list = JSON.parse(localStorage.getItem(LOGKEY) || "[]");
+  const tbody = document.getElementById('logRows');
+  tbody.innerHTML = list.map(r=>`<tr><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.prize)}</td><td>${new Date(r.ts).toLocaleString()}</td></tr>`).join('') || `<tr><td colspan="3">No spins yet on this device.</td></tr>`;
+}
+function escapeHtml(s){return (s||'').replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[m]));}
+function exportCsv(){
+  const list = JSON.parse(localStorage.getItem(LOGKEY) || "[]");
+  const rows = [["Name","Prize","Timestamp (ISO)"], ...list.map(r=>[r.name,r.prize,r.ts])];
+  const csv = rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob = new Blob([csv], {type:"text/csv"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "river-slots-results.csv"; a.click();
+  URL.revokeObjectURL(url);
+}
 
 /*** Spin ***/
 spinBtn.addEventListener('click', ()=>{
@@ -299,6 +362,7 @@ spinBtn.addEventListener('click', ()=>{
     statusEl.textContent="";
     showWin(playerName, prize.label);
     logSpin({playerName, prize:prize.label});
+    spinBtn.disabled=false;
   });
 });
 </script>
