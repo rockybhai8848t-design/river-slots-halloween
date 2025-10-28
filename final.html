@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>River Slots — Halloween Spin & Win 🎃</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+  :root{--bg:#0e0b12;--card:#15121b;--ink:#f4f1ff;--muted:#cfc7ffcc;--accent-2:#ffcc66;--line:rgba(255,255,255,0.08)}
+  *{box-sizing:border-box}body{margin:0;font-family:Poppins,system-ui,-apple-system,Segoe UI,Roboto;background:var(--bg);color:var(--ink)}
+  .container{max-width:980px;margin:0 auto;padding:24px 20px 64px}
+  .header{text-align:center}.header h1{margin:0;font-weight:800;font-size:clamp(28px,3.6vw,44px)}
+  .header .accent{color:var(--accent-2);text-shadow:0 0 18px rgba(255,165,66,.35)}
+  .subtitle{color:var(--muted)}
+  .card{margin:16px auto;padding:16px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(180deg,rgba(255,153,0,.06),rgba(0,0,0,0)),#15121b}
+  .form-row{display:flex;gap:12px;align-items:center;margin-bottom:10px}
+  .form-row label{width:120px;color:var(--muted)}
+  .form-row input{flex:1;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:#0d0a12;color:var(--ink)}
+  .wheel-area{display:grid;place-items:center;gap:14px;padding:12px}
+  #wheel{max-width:min(92vw,480px);max-height:min(92vw,480px)}
+  .btn{border:0;padding:14px 22px;border-radius:16px;background:linear-gradient(180deg,#ffb14d,#ff7a00);color:#1a0f00;font-weight:800}
+  .status{text-align:center;color:var(--muted);min-height:22px}.result{margin-top:10px;border-top:1px dashed var(--line);padding-top:10px}
+  .hidden{display:none}.footer{display:flex;justify-content:space-between;color:var(--muted);margin-top:20px}
+  </style>
+</head>
+<body>
+  <main class="container">
+    <header class="header">
+      <h1>River Slots <span class="accent">Halloween</span> Spin &amp; Win</h1>
+      <p class="subtitle">One spin per day • Enter your name • Good luck! 👻</p>
+    </header>
+    <section class="card">
+      <div class="form-row">
+        <label for="playerName">Your name</label>
+        <input id="playerName" type="text" placeholder="Enter your name" maxlength="40" autocomplete="name" />
+      </div>
+      <div class="wheel-area">
+        <canvas id="wheel" width="480" height="480" aria-label="Prize wheel" role="img"></canvas>
+        <button id="spinBtn" class="btn">🎡 Spin</button>
+      </div>
+      <p id="status" class="status"></p>
+      <div id="resultCard" class="result hidden">
+        <h3>🎉 Your result</h3>
+        <p id="resultText"></p>
+        <small>Results are recorded. Come back tomorrow.</small>
+      </div>
+    </section>
+    <footer class="footer">
+      <p>© <span id="year"></span> River Slots • Halloween Event</p>
+      <a href="#" id="adminHelp">Admin help</a>
+    </footer>
+    <!-- Netlify form (for private results) -->
+    <form name="spin-log" data-netlify="true" netlify-honeypot="bot-field" hidden>
+      <input type="text" name="player_name" />
+      <input type="text" name="prize" />
+      <input type="text" name="device_id" />
+      <input type="text" name="timestamp_iso" />
+      <input type="text" name="event_tag" value="RiverSlotsHalloween2025" />
+    </form>
+  </main>
+<script>
+window.RIVER_SLOTS_CONFIG = {
+  adminEmail: "mantramaria546@gmail.com",
+  eventTag: "RiverSlotsHalloween2025",
+  spinLimit: "daily",
+  prizes: [
+    { label: "50% Bonus", weight: 10 },
+    { label: "40% Bonus", weight: 20 },
+    { label: "$10 Freeplay", weight: 25 },
+    { label: "Refer 5 Friends & Get $20 (CashApp)", weight: 20 },
+    { label: "Extra $5 on the Game", weight: 20 },
+    { label: "100% Bonus", weight: 5 }
+  ]
+};
+(function(){
+  const cfg = window.RIVER_SLOTS_CONFIG;
+  const c = document.getElementById('wheel');
+  const x = c.getContext('2d');
+  const btn = document.getElementById('spinBtn');
+  const statusEl = document.getElementById('status');
+  const resultCard = document.getElementById('resultCard');
+  const resultText = document.getElementById('resultText');
+  const nameInput = document.getElementById('playerName');
+  document.getElementById('year').textContent = new Date().getFullYear();
+  document.getElementById('adminHelp').addEventListener('click', e=>{
+    e.preventDefault();
+    alert("After you deploy to Netlify (https://app.netlify.com/drop), open your site in Netlify → Forms tab → 'spin-log' to see results (private).");
+  });
+  const DEVKEY='rs_device_id', SPINKEY='rs_last_spin_ts';
+  const deviceId = localStorage.getItem(DEVKEY) || (localStorage.setItem(DEVKEY, (crypto.randomUUID?.() || (Date.now()+"-"+Math.random().toString(16).slice(2)))), localStorage.getItem(DEVKEY));
+  const segs = cfg.prizes.map(p=>({label:p.label, weight:p.weight}));
+  const total = segs.reduce((a,b)=>a+b.weight,0);
+  function draw(rot=0){
+    const size=c.width, r=size/2;
+    x.clearRect(0,0,size,size);
+    x.save(); x.translate(r,r); x.rotate(rot);
+    const colors=['#2b1a38','#3b214c','#4b285f','#5c3174','#6c3a89','#7c429d','#8c4ab1','#9c52c6','#ac5ada','#bd63ef','#cc6cfb','#dd76ff'];
+    let a=-Math.PI/2;
+    segs.forEach((s,i)=>{
+      const ang=(s.weight/total)*Math.PI*2, b=a+ang;
+      x.beginPath(); x.moveTo(0,0); x.arc(0,0,r,a,b); x.closePath();
+      x.fillStyle=colors[i%colors.length]; x.fill(); x.lineWidth=2; x.strokeStyle='rgba(255,255,255,.25)'; x.stroke();
+      x.save(); x.fillStyle='#fff4d6'; x.font='600 16px Poppins';
+      x.translate(Math.cos((a+b)/2)*r*0.65, Math.sin((a+b)/2)*r*0.65);
+      x.rotate((a+b)/2+Math.PI/2);
+      wrapText(x,s.label,0,0,r*0.5,18); x.restore(); a=b;
+    });
+    x.beginPath(); x.arc(0,0,r*0.1,0,Math.PI*2); x.fillStyle='#ffb14d'; x.fill(); x.lineWidth=3; x.strokeStyle='#5a3900'; x.stroke();
+    x.restore();
+    // pointer
+    x.save(); x.translate(r,0);
+    x.beginPath(); x.moveTo(r-14,10); x.lineTo(r-14,-10); x.lineTo(r+10,0); x.closePath();
+    x.fillStyle='#ffcc66'; x.fill(); x.lineWidth=2; x.strokeStyle='#5a3900'; x.stroke(); x.restore();
+  }
+  function wrapText(ctx,t,x,y,w,h){const a=t.split(' ');let l='',L=[];for(let i=0;i<a.length;i++){const tl=l+a[i]+' ';if(ctx.measureText(tl).width>w&&i>0){L.push(l.trim());l=a[i]+' ';}else l=tl;}L.push(l.trim());let yy=y-(L.length*h)/2+h/2;L.forEach(s=>{ctx.textAlign='center';ctx.fillText(s,x,yy);yy+=h;});}
+  draw(0);
+  function canSpin(){ if(cfg.spinLimit!=='daily') return true; const last=+localStorage.getItem(SPINKEY)||0; if(!last) return true; const d=new Date(last), n=new Date(); return !(d.getFullYear()==n.getFullYear()&&d.getMonth()==n.getMonth()&&d.getDate()==n.getDate()); }
+  function setNow(){ localStorage.setItem(SPINKEY, Date.now().toString()); }
+  function pick(){ const r=Math.random()*total; let a=0; for(const s of segs){ a+=s.weight; if(r<=a) return s;} return segs[segs.length-1]; }
+  function angleFor(lbl){ let a=-Math.PI/2; for(const s of segs){ const ang=(s.weight/total)*Math.PI*2, b=a+ang; if(s.label===lbl) return (a+b)/2; a=b;} return -Math.PI/2; }
+  function spinTo(target,done){ const turns=5+Math.floor(Math.random()*3); const final=(Math.PI*2)*turns+(target-(-Math.PI/2)); const dur=4600, start=performance.now();
+    function f(now){ const t=Math.min(1,(now-start)/dur), e=1-Math.pow(1-t,3); draw(e*final); if(t<1) requestAnimationFrame(f); else done(); }
+    requestAnimationFrame(f);
+  }
+  function log({playerName, prize}){ const data={"form-name":"spin-log",player_name:playerName,prize,device_id:deviceId,timestamp_iso:new Date().toISOString(),event_tag:cfg.eventTag}; const body=new URLSearchParams(data).toString(); return fetch("/",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body}).catch(()=>{}); }
+  btn.addEventListener('click', async ()=>{
+    const playerName=(nameInput.value||"").trim();
+    if(!playerName){ statusEl.textContent="Please enter your name before spinning."; nameInput.focus(); return; }
+    if(!canSpin()){ statusEl.textContent="You already spun today. Try again tomorrow!"; return; }
+    btn.disabled=true; statusEl.textContent="Spinning..."; resultCard.classList.add('hidden');
+    const prize=pick(); const target=angleFor(prize.label);
+    spinTo(target, async ()=>{ setNow(); statusEl.textContent=""; resultText.textContent=prize.label; resultCard.classList.remove('hidden'); try{ await log({playerName, prize:prize.label}); }catch(e){} btn.disabled=true; });
+  });
+})();
+</script>
+</body>
+</html>
